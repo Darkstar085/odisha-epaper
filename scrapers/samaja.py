@@ -18,25 +18,102 @@ def fetch(session, url):
     return r
 
 def discover_edition(session, date_iso):
-    # Current Samaja viewer uses /epaper/1/{edition}/{date}/{page}.
-    url = f"{BASE}/indexnext.php?mod=1"
-    r = fetch(session, url)
-    patterns = [
-        rf'href=["\']([^"\']*/epaper/1/(\d+)/{re.escape(date_iso)}/1)["\']',
-        rf'["\']([^"\']*/epaper/1/(\d+)/{re.escape(date_iso)}/1)["\']',
+    """Discover Samaja's Bhubaneswar edcode for the requested date.
+
+    Samaja's edcode is not the same as its public /epaper/ edition id and
+    changes between editions. The viewer accepts:
+      /indexnext.php?edcode=NN&mod=1&pagedate=YYYY-MM-DD&pgnum=1
+
+    We first inspect the main viewer/archive for explicit date/edcode links,
+    then fall back to probing the small current edcode range and identifying
+    the page whose title/metadata says Bhubaneswar.
+    """
+    import concurrent.futures
+
+    base_urls = [
+        f"{BASE}/indexnext.php?mod=1&pagedate={date_iso}&pgnum=1",
+        f"https://m.samajaepaper.in/indexnext.php?mod=1&pagedate={date_iso}&pgnum=1",
+        BASE,
+        "https://m.samajaepaper.in/",
     ]
-    for pat in patterns:
-        m = re.search(pat, r.text, re.I)
-        if m:
-            return urljoin(r.url, m.group(1)), m.group(2)
-    # Known public route can still be discovered from page links.
-    soup = BeautifulSoup(r.text, "html.parser")
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        m = re.search(r"/epaper/1/(\d+)/" + re.escape(date_iso) + r"/1", href)
-        if m:
-            return urljoin(r.url, href), m.group(1)
-    raise RuntimeError(f"Samaja edition not found for {date_iso}")
+
+    for index_url in base_urls:
+        try:
+            r = fetch(session, index_url)
+        except requests.RequestException:
+            continue
+
+        # Explicit viewer links are the best source.
+        matches = re.findall(
+            rf'(?:href|data-url|data-href)=["\']([^"\']*edcode=\d+[^"\']*pagedate={re.escape(date_iso)}[^"\']*)["\']',
+            r.text, re.I
+        )
+        for href in matches:
+            u = urljoin(r.url, href)
+            if re.search(r"(?:^|[?&])edcode=\d+", u, re.I):
+                # Confirm that this is actually the Bhubaneswar edition.
+                try:
+                    vr = fetch(session, u)
+                    title = vr.text.lower()
+                    if "bhubaneswar" in title:
+                        return u, re.search(r"(?:^|[?&])edcode=(\d+)", u, re.I).group(1)
+                except requests.RequestException:
+                    pass
+
+    # Current Samaja edcodes are compact and sequential. Probe a bounded
+    # range concurrently so a changed edcode does not break the pipeline.
+    def probe(code):
+        u = (
+            f"https://m.samajaepaper.in/indexnext.php?"
+            f"edcode={code}&mod=1&pagedate={date_iso}&pgnum=1"
+        )
+        try:
+            r = session.get(u, headers=HEADERS, timeout=(10, 25))
+            if not r.ok:
+                return None
+            text = r.text.lower()
+            if "bhubaneswar" not in text:
+                return None
+
+            # Prefer an explicit page title / edition marker containing the city.
+            soup = BeautifulSoup(r.text, "html.parser")
+            title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
+            body = soup.get_text(" ", strip=True).lower()
+            if "bhubaneswar" in title or "bhubaneswar" in body:
+                return u, str(code)
+        except requests.RequestException:
+            return None
+        return None
+
+    # Keep the range tight enough for CI but broad enough to survive changes.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+        results = list(pool.map(probe, range(1, 121)))
+
+    # If multiple pages mention the city in navigation, choose the one whose
+    # title explicitly identifies Bhubaneswar; otherwise prefer the first
+    # valid candidate after sorting by edcode.
+    valid = [x for x in results if x]
+    if valid:
+        # Re-fetch candidates and score explicit title/body matches.
+        scored = []
+        for u, code in valid:
+            try:
+                r = session.get(u, headers=HEADERS, timeout=(10, 25))
+                low = r.text.lower()
+                score = 0
+                if "<title" in low and "bhubaneswar" in low.split("</title>", 1)[0]:
+                    score += 100
+                if "bhubaneswar samaja" in low:
+                    score += 50
+                scored.append((score, int(code), u, code))
+            except requests.RequestException:
+                pass
+        if scored:
+            scored.sort(reverse=True)
+            _, _, u, code = scored[0]
+            return u, code
+
+    raise RuntimeError(f"Samaja Bhubaneswar edition not found for {date_iso}")
 
 def discover_page_base(session, edition):
     r = fetch(session, edition)

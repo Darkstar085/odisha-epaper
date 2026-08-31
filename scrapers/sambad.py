@@ -21,21 +21,73 @@ def get(session, url):
     return r
 
 def find_edition(session, date_iso):
-    for index in (f"{MOBILE}/indexnext.php", f"{BASE}/indexnext.php"):
-        r = get(session, index)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if date_iso in href and re.search(r"/epaper/1/\d+/", href):
-                text = " ".join(a.stripped_strings).lower()
-                if "bhubaneswar" in text or "bhubaneswar" in href.lower():
-                    return urljoin(r.url, href)
-        m = re.search(
-            rf'["\']([^"\']*/epaper/1/\d+/{re.escape(date_iso)}/1)["\']',
-            r.text, re.I
-        )
-        if m:
-            return urljoin(r.url, m.group(1))
+    """Find the current Bhubaneswar Sambad viewer.
+
+    The public edition number is not stable and the homepage/index can lag
+    behind the current date. Prefer explicit archive links, then probe the
+    compact edition-id range and identify the page whose title names
+    BHUBANESWAR.
+    """
+    import concurrent.futures
+
+    index_urls = (
+        f"{MOBILE}/indexnext.php",
+        f"{BASE}/indexnext.php",
+        "https://pdf.sambadepaper.com/",
+    )
+
+    for index in index_urls:
+        try:
+            r = get(session, index)
+        except requests.RequestException:
+            continue
+
+        # Look for a direct current-date edition URL in any form.
+        patterns = [
+            rf'["\']([^"\']*/epaper/1/(\d+)/{re.escape(date_iso)}/1)["\']',
+            rf'["\']([^"\']*/epaper/1/(\d+)/{re.escape(date_iso)}/[^"\']*)["\']',
+        ]
+        for pat in patterns:
+            for m in re.finditer(pat, r.text, re.I):
+                u = urljoin(r.url, m.group(1))
+                try:
+                    vr = get(session, u)
+                except requests.RequestException:
+                    continue
+                low = vr.text.lower()
+                if "bhubaneswar" in low and date_iso in low:
+                    return u
+
+    def probe(edition_id):
+        u = f"{MOBILE}/epaper/1/{edition_id}/{date_iso}/1"
+        try:
+            r = session.get(u, headers=HEADERS, timeout=(10, 25), allow_redirects=True)
+            if not r.ok:
+                return None
+            low = r.text.lower()
+            if date_iso not in low or "bhubaneswar" not in low:
+                return None
+            soup = BeautifulSoup(r.text, "html.parser")
+            title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
+            # The live viewer title currently identifies the edition/city.
+            score = 0
+            if "bhubaneswar" in title:
+                score += 100
+            if "bhubaneswar sambad epaper" in low:
+                score += 50
+            return score, edition_id, u
+        except requests.RequestException:
+            return None
+
+    # Sambad edition ids are small sequential integers. Probe concurrently.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
+        results = list(pool.map(probe, range(1, 151)))
+
+    valid = [x for x in results if x]
+    if valid:
+        valid.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        return valid[0][2]
+
     raise RuntimeError(f"Sambad Bhubaneswar edition not found for {date_iso}")
 
 def page_count(session, edition):
