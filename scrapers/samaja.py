@@ -1,156 +1,107 @@
 
-import hashlib
-import os
 import re
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from urllib.parse import urljoin
 
-import img2pdf
 import requests
+from bs4 import BeautifulSoup
+from pypdf import PdfReader, PdfWriter
 
-from scrapers.image_quality import extract_candidates, choose_best_candidate
+BASE = "https://www.samajaepaper.in"
+HEADERS = {"User-Agent": "Mozilla/5.0 Chrome/128.0 Safari/537.36"}
 
+def fetch(session, url):
+    r = session.get(url, headers=HEADERS, timeout=(20, 60))
+    r.raise_for_status()
+    return r
 
-BASE = "https://m.samajaepaper.in"
-EDCODE = 73
-SUBCODE = 73
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-}
-
-
-def _page_url_variants(ds, n):
-    keys = ("pgnum", "pageno", "page", "page_no", "pgno")
-    return [
-        f"{BASE}/indexnext.php?pagedate={ds}&edcode={EDCODE}"
-        f"&subcode={SUBCODE}&mod=1&{key}={n}&type=a"
-        for key in keys
+def discover_edition(session, date_iso):
+    # Current Samaja viewer uses /epaper/1/{edition}/{date}/{page}.
+    url = f"{BASE}/indexnext.php?mod=1"
+    r = fetch(session, url)
+    patterns = [
+        rf'href=["\']([^"\']*/epaper/1/(\d+)/{re.escape(date_iso)}/1)["\']',
+        rf'["\']([^"\']*/epaper/1/(\d+)/{re.escape(date_iso)}/1)["\']',
     ]
+    for pat in patterns:
+        m = re.search(pat, r.text, re.I)
+        if m:
+            return urljoin(r.url, m.group(1)), m.group(2)
+    # Known public route can still be discovered from page links.
+    soup = BeautifulSoup(r.text, "html.parser")
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        m = re.search(r"/epaper/1/(\d+)/" + re.escape(date_iso) + r"/1", href)
+        if m:
+            return urljoin(r.url, href), m.group(1)
+    raise RuntimeError(f"Samaja edition not found for {date_iso}")
 
+def discover_page_base(session, edition):
+    r = fetch(session, edition)
+    m = re.search(r'https?://[^"\']*epaperimages[^"\']+?\.jpg', r.text, re.I)
+    if not m:
+        m = re.search(r'(?:https?:)?//[^"\']*epaperimages[^"\']+?\.jpg', r.text, re.I)
+    if not m:
+        raise RuntimeError("Samaja page image base not found")
+    return m.group(0).replace("\\/", "/")
 
-def _resolve_page(session, html, page_url, page_no, seen):
-    candidates = extract_candidates(
-        html, page_url, page_no=page_no, reject_page_urls=False
-    )
-
-    # Samaja exposes the real page raster directly in the viewer HTML
-    # (for example /epaperimages/.../06072026-md-an-1.jpg).
-    # Do NOT return the first matching candidate: compare actual dimensions.
-    return choose_best_candidate(
-        session,
-        candidates,
-        page_url,
-        seen_digests=seen,
-        max_candidates=100,
-        verbose=False,
-    )
-
+def make_pdf_url(image_url, page_no):
+    # Preserve the publisher's path/date/edition and replace the page suffix.
+    u = re.sub(r'-(\d+)\.jpg(?:\?.*)?$', f"-{page_no}.pdf", image_url, flags=re.I)
+    if u.lower().endswith(".pdf"):
+        return u
+    return re.sub(r'\.(?:jpe?g|png|webp)(?:\?.*)?$', ".pdf", image_url, flags=re.I)
 
 def download_samaja():
     d = datetime.now(ZoneInfo("Asia/Kolkata"))
-    ds = d.strftime("%Y-%m-%d")
-    out = Path(f"Samaja_{d:%Y%m%d}.pdf")
-    files = []
-    seen = set()
+    date_iso = d.strftime("%Y-%m-%d")
+    out = Path(f"Samaja_bhubaneswar_{d:%Y%m%d}.pdf")
+    tmp = []
     session = requests.Session()
 
     print("=" * 60)
-    print(f"📰 SAMAJA — BHUBANESWAR — {ds}")
+    print(f"📰 SAMAJA — BHUBANESWAR — {date_iso}")
     print("=" * 60)
 
+    edition, edition_id = discover_edition(session, date_iso)
+    print(f"✓ Edition: {edition}")
+
+    page = fetch(session, edition)
+    nums = [int(x) for x in re.findall(r"(?:Page\s*(?:No\.?)?\s*|pageno=)(\d+)", page.text, re.I)]
+    total = max(nums) if nums else 23
+    print(f"🔎 Found {total} pages")
+
+    base = discover_page_base(session, edition)
+    print(f"🔗 Page-image base: {base}")
+
+    # Normalize duplicate slashes only for path construction; retain host.
+    base = re.sub(r"-\d+\.jpg$", "-{PAGE}.jpg", base, flags=re.I)
+
+    writer = PdfWriter()
     try:
-        first_url = _page_url_variants(ds, 1)[0]
-        first = session.get(first_url, headers=HEADERS, timeout=40)
-        first.raise_for_status()
-
-        nums = {
-            int(x)
-            for x in re.findall(r"Page\s*(?:No\.?)?\s*(\d+)", first.text, re.I)
-            if 1 <= int(x) <= 100
-        }
-        nums.update(
-            int(x)
-            for x in re.findall(
-                r"(?:pgnum|pageno|page|page_no)=(\d+)", first.text, re.I
-            )
-            if 1 <= int(x) <= 100
-        )
-
-        counts = re.findall(
-            r'(?:totalPages|pageCount|total_page|totalPagesCount)'
-            r'\s*[:=]\s*["\']?(\d+)',
-            first.text,
-            re.I,
-        )
-        if counts:
-            nums.update(range(1, max(map(int, counts)) + 1))
-
-        if not nums:
-            raise RuntimeError("Samaja: no page numbers found")
-
-        total = max(nums)
-        print(f"🔎 Found {total} pages")
-
         for n in range(1, total + 1):
-            selected = None
+            image_url = base.replace("{PAGE}", str(n))
+            pdf_url = make_pdf_url(image_url, n)
+            r = session.get(pdf_url, headers=HEADERS, timeout=(20, 120))
+            if not r.ok or not r.content.startswith(b"%PDF"):
+                raise RuntimeError(f"Samaja native PDF unavailable for page {n}: {pdf_url}")
+            path = Path(f".samaja_{n:03d}.pdf")
+            path.write_bytes(r.content)
+            reader = PdfReader(str(path))
+            for p in reader.pages:
+                writer.add_page(p)
+            tmp.append(path)
+            print(f"   ✓ Native PDF page {n:02d} — {len(r.content)/1048576:.2f} MB — {pdf_url}")
 
-            for url in _page_url_variants(ds, n):
-                try:
-                    page = session.get(url, headers=HEADERS, timeout=40)
-                    if not page.ok:
-                        continue
-
-                    candidate = _resolve_page(
-                        session, page.text, page.url, n, seen
-                    )
-
-                    if candidate:
-                        selected = candidate
-                        break
-                except requests.RequestException:
-                    continue
-
-            if not selected:
-                raise RuntimeError(
-                    f"Samaja: no high-quality image for page {n}"
-                )
-
-            seen.add(selected.digest)
-
-            ext = "jpg" if selected.fmt.upper() in {"JPEG", "JPG"} else selected.fmt.lower()
-            fn = Path(f"samaja_page_{n:02d}.{ext}")
-            fn.write_bytes(selected.data)
-            files.append(str(fn))
-
-            print(
-                f"✓ Page {n:02d} — {selected.width}x{selected.height} — "
-                f"{len(selected.data)/1048576:.2f} MB — {selected.url}",
-                flush=True,
-            )
-
-        # img2pdf embeds JPEGs without re-JPEG-compressing them.
         with out.open("wb") as f:
-            f.write(img2pdf.convert(files))
-
-        print(
-            f"✅ Samaja PDF ready: {len(files)} pages / "
-            f"{out.stat().st_size/1048576:.2f} MB"
-        )
+            writer.write(f)
+        print(f"✅ Samaja PDF: {out} ({out.stat().st_size/1048576:.2f} MB)")
         return str(out)
-
     finally:
-        for filename in files:
-            try:
-                os.remove(filename)
-            except OSError:
-                pass
-
+        for p in tmp:
+            p.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     download_samaja()

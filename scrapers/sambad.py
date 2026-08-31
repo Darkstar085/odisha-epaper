@@ -1,172 +1,128 @@
 
-import os
+import hashlib
 import re
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
+from urllib.parse import urljoin
 
 import img2pdf
 import requests
 from bs4 import BeautifulSoup
 
-from scrapers.image_quality import extract_candidates, choose_best_candidate
-
+from .image_quality import HEADERS, download_image
 
 BASE = "https://sambadepaper.com"
-INDEX = f"{BASE}/indexnext.php"
-MAX_PAGES = 100
+MOBILE = "https://m.sambadepaper.com"
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    )
-}
+def get(session, url):
+    r = session.get(url, headers=HEADERS, timeout=(20, 60))
+    r.raise_for_status()
+    return r
 
-
-def _find_bhubaneswar_edition(session, date_iso):
-    response = session.get(INDEX, headers=HEADERS, timeout=40)
-    response.raise_for_status()
-
-    soup = BeautifulSoup(response.text, "html.parser")
-    wanted = date_iso
-
-    for a in soup.find_all("a", href=True):
-        text = " ".join(a.stripped_strings).upper()
-        href = a["href"]
-
-        if "BHUBANESWAR" not in text:
-            continue
-
-        match = re.search(
-            r"/epaper/1/(\d+)/(\d{4}-\d{2}-\d{2})/1",
-            href,
-            re.I,
+def find_edition(session, date_iso):
+    for index in (f"{MOBILE}/indexnext.php", f"{BASE}/indexnext.php"):
+        r = get(session, index)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if date_iso in href and re.search(r"/epaper/1/\d+/", href):
+                text = " ".join(a.stripped_strings).lower()
+                if "bhubaneswar" in text or "bhubaneswar" in href.lower():
+                    return urljoin(r.url, href)
+        m = re.search(
+            rf'["\']([^"\']*/epaper/1/\d+/{re.escape(date_iso)}/1)["\']',
+            r.text, re.I
         )
-        if match and match.group(2) == wanted:
-            return urljoin(response.url, href)
+        if m:
+            return urljoin(r.url, m.group(1))
+    raise RuntimeError(f"Sambad Bhubaneswar edition not found for {date_iso}")
 
-    # Fallback: search the raw HTML for a matching edition URL near
-    # BHUBANESWAR. This handles the site's slightly inconsistent markup.
-    for match in re.finditer(
-        r'href=["\']([^"\']*/epaper/1/\d+/' + re.escape(wanted) + r'/1)["\']',
-        response.text,
-        re.I,
-    ):
-        href = urljoin(response.url, match.group(1))
-        return href
+def page_count(session, edition):
+    r = get(session, edition)
+    nums = [int(x) for x in re.findall(r"(?:Page\s*(?:No\.?)?\s*|pageno=)(\d+)", r.text, re.I)]
+    # The viewer normally exposes all page numbers in its navigation.
+    return max(nums) if nums else 17
 
-    raise RuntimeError(
-        f"Sambad: today's BHUBANESWAR edition not found for {date_iso}"
-    )
+def discover_image_template(session, edition):
+    r = get(session, edition)
+    soup = BeautifulSoup(r.text, "html.parser")
+    candidates = []
 
+    for tag in soup.find_all(["img", "source"]):
+        for key in ("src", "data-src", "data-original", "data-full", "data-zoom-image"):
+            val = tag.get(key)
+            if val and "epaperimages" in val.lower() and re.search(r"\.(?:jpg|jpeg|png|webp)", val, re.I):
+                candidates.append(urljoin(r.url, val))
 
-def _page_url(edition_url, page_no):
-    return re.sub(r"/1$", f"/{page_no}", edition_url)
+    for raw in re.findall(r'https?://[^"\'\\\s<>]+epaperimages[^"\'\\\s<>]+\.(?:jpg|jpeg|png|webp)', r.text, re.I):
+        candidates.append(raw)
 
+    for u in candidates:
+        # Reject thumbnail and turn page number into {PAGE}.
+        u = re.sub(r'[-_]1s(?=\.(?:jpg|jpeg|png|webp))', '-{PAGE}', u, flags=re.I)
+        u = re.sub(r'[-_]1(?=\.(?:jpg|jpeg|png|webp))', '-{PAGE}', u, flags=re.I)
+        if "{PAGE}" in u:
+            return u
 
-def _find_total_pages(html):
-    numbers = {
-        int(x)
-        for x in re.findall(r"Page\s*(?:No\.?)?\s*(\d+)", html, re.I)
-        if 1 <= int(x) <= MAX_PAGES
-    }
-    return max(numbers) if numbers else 0
-
+    raise RuntimeError("Sambad original page-image template not found")
 
 def download_sambad():
     d = datetime.now(ZoneInfo("Asia/Kolkata"))
     date_iso = d.strftime("%Y-%m-%d")
-    date_compact = d.strftime("%d%m%Y")
-    out = Path(f"Sambad_bhubaneswar_{date_compact}.pdf")
-
+    out = Path(f"Sambad_bhubaneswar_{d:%Y%m%d}.pdf")
+    session = requests.Session()
     files = []
     seen = set()
-    session = requests.Session()
 
     print("=" * 60)
     print(f"📰 SAMBAD — BHUBANESWAR — {date_iso}")
     print("=" * 60)
 
+    edition = find_edition(session, date_iso)
+    total = page_count(session, edition)
+    template = discover_image_template(session, edition)
+    print(f"✓ Edition/source: {edition}")
+    print(f"🔎 Found {total} pages")
+    print(f"🔗 Original image template: {template}")
+
     try:
-        edition = _find_bhubaneswar_edition(session, date_iso)
-        print(f"✓ Edition: {edition}")
+        for n in range(1, total + 1):
+            url = template.replace("{PAGE}", str(n))
+            # Never accept the small 's' variant.
+            url = re.sub(r'(-\d+)s(\.(?:jpe?g|png|webp))$', r'\1\2', url, flags=re.I)
 
-        first = session.get(
-            _page_url(edition, 1),
-            headers=HEADERS,
-            timeout=40,
-        )
-        first.raise_for_status()
+            result = download_image(session, url, edition)
+            if not result:
+                # Try direct filename variants if the template came from a viewer.
+                variants = [
+                    re.sub(r'-(?:\d+)(?=\.(?:jpe?g|png|webp)$)', f"-{n}", url, flags=re.I),
+                    re.sub(r'-(?:\d+)s(?=\.(?:jpe?g|png|webp)$)', f"-{n}", url, flags=re.I),
+                ]
+                for v in variants:
+                    result = download_image(session, v, edition)
+                    if result:
+                        break
 
-        total = _find_total_pages(first.text)
-        if not total:
-            raise RuntimeError("Sambad: no page numbers found")
+            if not result:
+                raise RuntimeError(f"Sambad: no original image for page {n}: {url}")
 
-        print(f"🔎 Found {total} pages")
+            if result.digest in seen:
+                raise RuntimeError(f"Sambad: duplicate image detected on page {n}: {result.url}")
+            seen.add(result.digest)
 
-        for page_no in range(1, total + 1):
-            page_url = _page_url(edition, page_no)
-            print(f"📄 Page {page_no}/{total} — resolving images", flush=True)
+            path = Path(f".sambad_{n:03d}.jpg")
+            path.write_bytes(result.data)
+            files.append(str(path))
+            print(f"✓ Page {n:02d} — {result.width}x{result.height} — {len(result.data)/1048576:.2f} MB — {result.url}")
 
-            response = session.get(page_url, headers=HEADERS, timeout=40)
-            response.raise_for_status()
-
-            candidates = extract_candidates(
-                response.text,
-                response.url,
-                page_no=page_no,
-                reject_page_urls=True,
-            )
-
-            selected = choose_best_candidate(
-                session,
-                candidates,
-                response.url,
-                seen_digests=seen,
-                max_candidates=100,
-                verbose=False,
-            )
-
-            if not selected:
-                raise RuntimeError(
-                    f"Sambad: no high-quality image for page {page_no}"
-                )
-
-            seen.add(selected.digest)
-
-            ext = "jpg" if selected.fmt.upper() in {"JPEG", "JPG"} else selected.fmt.lower()
-            fn = Path(f"sambad_{page_no:02d}.{ext}")
-            fn.write_bytes(selected.data)
-            files.append(str(fn))
-
-            print(
-                f"✓ Page {page_no:02d} — {selected.width}x{selected.height} — "
-                f"{len(selected.data)/1048576:.2f} MB — {selected.url}",
-                flush=True,
-            )
-
-        # IMPORTANT: do not use the old ...-md-hr-{page}.jpg guess.
-        # The live viewer exposes the actual page raster, including
-        # edition-specific names such as ...-md-hr-1.jpg or ...-md-bl-1.jpg.
-        with out.open("wb") as pdf:
-            pdf.write(img2pdf.convert(files))
-
-        print(
-            f"✅ Sambad PDF ready: {len(files)} pages / "
-            f"{out.stat().st_size/1048576:.2f} MB"
-        )
+        with out.open("wb") as f:
+            f.write(img2pdf.convert(files))
+        print(f"✅ Sambad PDF: {out} ({out.stat().st_size/1048576:.2f} MB)")
         return str(out)
-
     finally:
-        for filename in files:
-            try:
-                os.remove(filename)
-            except OSError:
-                pass
-
+        for p in files:
+            Path(p).unlink(missing_ok=True)
 
 if __name__ == "__main__":
     download_sambad()

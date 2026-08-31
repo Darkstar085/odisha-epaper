@@ -45,7 +45,7 @@ def _send_bot_api(pdf_path, caption):
                         "application/pdf",
                     )
                 },
-                timeout=300,
+                timeout=600,
             )
 
         if response.ok:

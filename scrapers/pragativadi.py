@@ -190,7 +190,7 @@ def download_pragativadi():
                 flush=True,
             )
 
-        # Removed the old JPEG quality=62 / 4:2:0 recompression.
+        # Removed the old JPEG quality=92 / 4:2:0 recompression.
         # img2pdf embeds JPEG page rasters directly.
         with out.open("wb") as pdf:
             pdf.write(img2pdf.convert(files))
