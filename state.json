@@ -1,19 +1,5 @@
 {
   "sent": {
-    "pragativadi:2026-09-05": {
-      "sent_at": "2026-09-05T06:50:30.616217Z",
-      "sha256": "d33525d4b79121d03ce5bb13085514d6d2c0bef95b0e32f2d4143d70a84e81d7",
-      "pages": null,
-      "size_mb": 17.08,
-      "uploader": "bot"
-    },
-    "sambad:2026-09-06": {
-      "sent_at": "2026-09-06T06:58:04.575821Z",
-      "sha256": "dd19f3a25d62db8ac804ad674f1ccce02bf6d1206568993ef81081db156d4556",
-      "pages": null,
-      "size_mb": 11.16,
-      "uploader": "bot"
-    },
     "samaja:2026-09-07": {
       "sent_at": "2026-09-07T08:08:18.516826Z",
       "sha256": "d9923463e30c622efb21dd463b57f518cb8d71095311f3489670131b64bde5df",
@@ -48,15 +34,29 @@
       "pages": null,
       "size_mb": 3.07,
       "uploader": "bot"
+    },
+    "sambad:2026-09-07": {
+      "sent_at": "2026-09-07T11:03:54.398383Z",
+      "sha256": "14bf4d2a2aa4955a87f391dbead29176642204e2f83181ded78393c09aeaf6c8",
+      "pages": null,
+      "size_mb": 10.96,
+      "uploader": "bot"
+    },
+    "pragativadi:2026-09-07": {
+      "sent_at": "2026-09-07T11:12:16.504855Z",
+      "sha256": "cf24f412fb40f4c237db3c9bcd08856191ee7f2ea584d27afd4ad4f5bba6df5a",
+      "pages": null,
+      "size_mb": 16.36,
+      "uploader": "bot"
     }
   },
   "hashes": {
-    "d33525d4b79121d03ce5bb13085514d6d2c0bef95b0e32f2d4143d70a84e81d7": "pragativadi:2026-09-05",
-    "dd19f3a25d62db8ac804ad674f1ccce02bf6d1206568993ef81081db156d4556": "sambad:2026-09-06",
     "d9923463e30c622efb21dd463b57f518cb8d71095311f3489670131b64bde5df": "samaja:2026-09-07",
     "d00b7be7c483d29e3aff9550e45a1248605f4bf7a118f8686938a2730110e7c9": "dharitri:2026-09-07",
     "1d879724bc66f797244f019959db1290d2d55911185956aa5f19324b489aeb36": "prameya:2026-09-07",
     "c7c006082a0606120b59d4cf911dc9bf377496571d0042594de3d58bf2fdd0db": "sanchar:2026-09-07",
-    "c3a0621cbfe820178f783498f89b5a4dda5954813233fb1024048701fc84842e": "swadhikar:2026-09-07"
+    "c3a0621cbfe820178f783498f89b5a4dda5954813233fb1024048701fc84842e": "swadhikar:2026-09-07",
+    "14bf4d2a2aa4955a87f391dbead29176642204e2f83181ded78393c09aeaf6c8": "sambad:2026-09-07",
+    "cf24f412fb40f4c237db3c9bcd08856191ee7f2ea584d27afd4ad4f5bba6df5a": "pragativadi:2026-09-07"
   }
 }
