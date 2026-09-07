@@ -4,6 +4,12 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from pdf_utils import compress_pdf_for_upload
+from scrapers.additional import (
+    download_dinalipi,
+    download_odisha_bhaskar,
+    download_sanchar,
+    download_swadhikar,
+)
 from scrapers.dharitri import download_dharitri
 from scrapers.pragativadi import download_pragativadi
 from scrapers.prameya import download_prameya
@@ -38,6 +44,10 @@ def main():
         ("Dharitri", download_dharitri),
         ("Pragativadi", download_pragativadi),
         ("Prameya", download_prameya),
+        ("Dinalipi", download_dinalipi),
+        ("Odisha Bhaskar", download_odisha_bhaskar),
+        ("Sanchar", download_sanchar),
+        ("Swadhikar", download_swadhikar),
     ]
 
     print("=" * 64)

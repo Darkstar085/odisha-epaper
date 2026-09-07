@@ -9,6 +9,10 @@ Automated daily downloader and Telegram publisher for major Odisha newspapers.
 - 📰 Dharitri
 - 📰 Pragativadi
 - 📰 Prameya
+- 📰 Dinalipi
+- 📰 Odisha Bhaskar
+- 📰 Sanchar
+- 📰 Swadhikar
 
 ### Features
 
