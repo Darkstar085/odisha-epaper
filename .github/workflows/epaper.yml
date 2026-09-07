@@ -52,6 +52,7 @@ jobs:
             echo "No delivery-state changes to commit."
             exit 0
           fi
+
           edition_date="$(python - <<'PY'
           import json
 
@@ -65,30 +66,45 @@ jobs:
 
           delivery_summary="$(python - <<'PY'
           import json
+          import re
+          import subprocess
 
           with open("state.json", encoding="utf-8") as f:
               state = json.load(f)
 
+          diff = subprocess.check_output(
+              ["git", "diff", "--cached", "--unified=0", "--", "state.json"],
+              text=True,
+          )
+
+          changed = set()
+          pattern = re.compile(r'^\+\s*"([^"]+)":\s*\{$')
+          for line in diff.splitlines():
+              match = pattern.match(line)
+              if match and ":" in match.group(1):
+                  changed.add(match.group(1))
+
           items = []
-          for key, info in state.get("sent", {}).items():
-              if ":" not in key:
+          for key in sorted(changed):
+              info = state.get("sent", {}).get(key)
+              if not info:
                   continue
               newspaper, date = key.split(":", 1)
-              items.append((date, newspaper, info.get("size_mb")))
-
-          for date, newspaper, size_mb in sorted(items, reverse=True):
+              size_mb = info.get("size_mb")
               size = f" — {size_mb:.2f} MB" if isinstance(size_mb, (int, float)) else ""
-              print(f"- {newspaper.title()}: {date}{size}")
+              items.append(f"- {newspaper.title()}: {date}{size}")
+
+          print("\n".join(items) if items else "- No newspaper delivery entries changed")
           PY
           )"
 
-          commit_title="chore: update daily newspaper delivery state — ${edition_date}"
+          commit_title="chore: update daily newspaper delivery — ${edition_date}"
           commit_body="$(cat <<EOF
           📰 Daily Odisha E-Paper Delivery
 
-          📅 Latest edition: ${edition_date}
+          📅 Updated edition: ${edition_date}
 
-          ✅ Successfully delivered:
+          ✅ Updated in this run:
           ${delivery_summary}
 
           📦 Delivery state updated

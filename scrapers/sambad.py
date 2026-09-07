@@ -1,3 +1,4 @@
+import concurrent.futures
 import re
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,7 @@ from .image_quality import HEADERS, download_image
 
 BASE = "https://sambadepaper.com"
 MOBILE = "https://m.sambadepaper.com"
+MAX_WORKERS = 6
 
 
 def get(session, url):
@@ -118,11 +120,32 @@ def discover_image_template(session, edition):
     raise RuntimeError("Sambad original page-image template not found")
 
 
+def _download_page(n, template, edition):
+    session = requests.Session()
+    try:
+        url = template.replace("{PAGE}", str(n))
+        url = re.sub(r"(-\d+)s(\.(?:jpe?g|png|webp))$", r"\1\2", url, flags=re.I)
+
+        result = download_image(session, url, edition)
+        if not result:
+            variants = [
+                re.sub(r"-(?:\d+)(?=\.(?:jpe?g|png|webp)$)", f"-{n}", url, flags=re.I),
+                re.sub(r"-(?:\d+)s(?=\.(?:jpe?g|png|webp)$)", f"-{n}", url, flags=re.I),
+            ]
+            for variant in variants:
+                result = download_image(session, variant, edition)
+                if result:
+                    break
+
+        return n, result
+    except requests.RequestException:
+        return n, None
+
+
 def download_sambad():
     d = datetime.now(ZoneInfo("Asia/Kolkata"))
     date_iso = d.strftime("%Y-%m-%d")
     out = Path(f"Sambad_bhubaneswar_{d:%Y%m%d}.pdf")
-    session = requests.Session()
     files = []
     seen = set()
 
@@ -130,33 +153,26 @@ def download_sambad():
     print(f"📰 SAMBAD — BHUBANESWAR — {date_iso}")
     print("=" * 60)
 
+    session = requests.Session()
     edition = find_edition(session, date_iso)
     total = page_count(session, edition)
     template = discover_image_template(session, edition)
     print(f"✓ Edition/source: {edition}")
     print(f"🔎 Found {total} pages")
     print(f"🔗 Original image template: {template}")
+    print(f"⚡ Downloading up to {MAX_WORKERS} pages concurrently...")
 
     try:
-        for n in range(1, total + 1):
-            url = template.replace("{PAGE}", str(n))
-            url = re.sub(r'(-\d+)s(\.(?:jpe?g|png|webp))$', r'\1\2', url, flags=re.I)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            results = list(
+                pool.map(
+                    lambda n: _download_page(n, template, edition),
+                    range(1, total + 1),
+                )
+            )
 
-            result = download_image(session, url, edition)
+        for n, result in results:
             if not result:
-                variants = [
-                    re.sub(r'-(?:\d+)(?=\.(?:jpe?g|png|webp)$)', f"-{n}", url, flags=re.I),
-                    re.sub(r'-(?:\d+)s(?=\.(?:jpe?g|png|webp)$)', f"-{n}", url, flags=re.I),
-                ]
-                for v in variants:
-                    result = download_image(session, v, edition)
-                    if result:
-                        break
-
-            if not result:
-                # Some Sambad editions advertise a page slot whose original
-                # raster is not published. Keep the rest of the edition rather
-                # than failing the complete daily delivery.
                 print(f"⚠ Page {n:02d} is unavailable; skipping it.")
                 continue
 
@@ -167,7 +183,10 @@ def download_sambad():
             path = Path(f".sambad_{n:03d}.jpg")
             path.write_bytes(result.data)
             files.append(str(path))
-            print(f"✓ Page {n:02d} — {result.width}x{result.height} — {len(result.data)/1048576:.2f} MB — {result.url}")
+            print(
+                f"✓ Page {n:02d} — {result.width}x{result.height} — "
+                f"{len(result.data)/1048576:.2f} MB — {result.url}"
+            )
 
         if not files:
             raise RuntimeError("Sambad: no page images could be downloaded")

@@ -1,3 +1,4 @@
+import concurrent.futures
 import os
 import re
 from datetime import datetime
@@ -11,8 +12,8 @@ from bs4 import BeautifulSoup
 
 from scrapers.image_quality import extract_candidates, choose_best_candidate
 
-
 BASE = "https://epaper.pragativadi.com"
+MAX_WORKERS = 6
 
 HEADERS = {
     "User-Agent": (
@@ -34,9 +35,6 @@ def _fetch_page(session, url):
 
 
 def _find_edition(session, date):
-    # The Pragativadi e-paper migrated from the old category/7 URL to
-    # date-based edition URLs. Try the current public URL first, then retain
-    # the old category lookup as a compatibility fallback.
     direct_urls = (
         f"{BASE}/edition/twin-city/{date}/page/1",
         f"{BASE}/edition/twin-city/{date}",
@@ -89,13 +87,12 @@ def _find_total_pages(html):
     return max(nums) if nums else 0
 
 
-def _resolve_page(session, edition, page_no, seen):
-    last_error = None
+def _resolve_page(edition, page_no):
+    session = requests.Session()
 
     for page_url in _page_variants(edition, page_no):
         try:
             response = _fetch_page(session, page_url)
-
             candidates = extract_candidates(
                 response.text,
                 response.url,
@@ -107,24 +104,17 @@ def _resolve_page(session, edition, page_no, seen):
                 session,
                 candidates,
                 response.url,
-                seen_digests=seen,
+                seen_digests=set(),
                 max_candidates=100,
                 verbose=False,
             )
 
             if selected:
-                return selected
+                return page_no, selected
+        except requests.RequestException:
+            continue
 
-        except requests.RequestException as exc:
-            last_error = exc
-
-    if last_error:
-        print(
-            f"   ⚠ page {page_no}: {type(last_error).__name__}: {last_error}",
-            flush=True,
-        )
-
-    return None
+    return page_no, None
 
 
 def download_pragativadi():
@@ -134,14 +124,13 @@ def download_pragativadi():
     out = Path(f"Pragativadi_{d:%Y%m%d}.pdf")
 
     files = []
-    seen = set()
-    session = requests.Session()
 
     print("=" * 60)
     print(f"📰 PRAGATIVADI — TWIN CITY — {date}")
     print("=" * 60)
 
     try:
+        session = requests.Session()
         edition = _find_edition(session, date_iso)
         print(f"✓ Edition: {edition}")
 
@@ -152,20 +141,25 @@ def download_pragativadi():
             raise RuntimeError("Pragativadi: no page numbers found")
 
         print(f"🔎 Found {total} pages")
+        print(f"⚡ Resolving up to {MAX_WORKERS} pages concurrently...")
 
-        for page_no in range(1, total + 1):
-            print(
-                f"📄 Page {page_no}/{total} — resolving highest-resolution raster",
-                flush=True,
-            )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+            results = list(pool.map(lambda n: _resolve_page(edition, n), range(1, total + 1)))
 
-            selected = _resolve_page(session, edition, page_no, seen)
+        results.sort(key=lambda item: item[0])
+        seen = set()
 
+        for page_no, selected in results:
             if not selected:
                 raise RuntimeError(
                     f"Pragativadi: no high-quality image for page {page_no}"
                 )
 
+            if selected.digest in seen:
+                raise RuntimeError(
+                    f"Pragativadi: duplicate image detected on page {page_no}: "
+                    f"{selected.url}"
+                )
             seen.add(selected.digest)
 
             ext = "jpg" if selected.fmt.upper() in {"JPEG", "JPG"} else selected.fmt.lower()
