@@ -1,4 +1,3 @@
-
 import os
 import re
 from datetime import datetime
@@ -35,34 +34,37 @@ def _fetch_page(session, url):
 
 
 def _find_edition(session, date):
-    category = _fetch_page(
-        session,
-        f"{BASE}/category/7/bhubaneswar",
+    # The Pragativadi e-paper migrated from the old category/7 URL to
+    # date-based edition URLs. Try the current public URL first, then retain
+    # the old category lookup as a compatibility fallback.
+    direct_urls = (
+        f"{BASE}/edition/twin-city/{date}/page/1",
+        f"{BASE}/edition/twin-city/{date}",
     )
 
-    soup = BeautifulSoup(category.content, "html.parser")
+    for url in direct_urls:
+        try:
+            response = _fetch_page(session, url)
+        except requests.RequestException:
+            continue
+        low = response.text.lower()
+        if date in low and "twin city" in low:
+            return response.url
+
+    legacy = _fetch_page(session, f"{BASE}/epaper?alias=bhubaneswar&id=7")
+    soup = BeautifulSoup(legacy.content, "html.parser")
 
     for a in soup.find_all("a", href=True):
-        href = a["href"]
-        text = " ".join(a.stripped_strings).lower()
-        if "twin-city" in href.lower() and date in href and "/edition/" in href:
-            return urljoin(category.url, href)
+        href = urljoin(legacy.url, a["href"])
+        if "/edition/" in href and date in href and "twin-city" in href.lower():
+            return href
 
-    for raw in re.findall(
-        r'href=["\']([^"\']*/edition/\d+/[^"\']*twin-city[^"\']*)["\']',
-        category.text,
-        re.I,
-    ):
-        if date in raw:
-            return urljoin(category.url, raw)
-
-    raise RuntimeError(
-        f"Pragativadi: today's TWIN CITY edition not found for {date}"
-    )
+    raise RuntimeError(f"Pragativadi: today's TWIN CITY edition not found for {date}")
 
 
 def _page_variants(edition, page_no):
     base = edition.rstrip("/")
+    base = re.sub(r"/page/\d+$", "", base)
     return [
         f"{base}/page/{page_no}",
         f"{base}/page/{page_no}/",
@@ -72,25 +74,19 @@ def _page_variants(edition, page_no):
 def _find_total_pages(html):
     nums = set()
 
-    for text in BeautifulSoup(html, "html.parser").stripped_strings:
-        m = re.fullmatch(r"Page No\s+(\d{1,3})", text)
-        if m:
-            nums.add(int(m.group(1)))
+    for match in re.finditer(r"(?:Page\s*(?:No\.?)?\s*|pageno=)(\d+)", html, re.I):
+        nums.add(int(match.group(1)))
+
+    for match in re.finditer(r"/page/(\d+)", html, re.I):
+        nums.add(int(match.group(1)))
 
     if not nums:
         for text in BeautifulSoup(html, "html.parser").stripped_strings:
-            for m in re.finditer(r"TWIN CITY.*?-(\d{1,3})$", text, re.I):
+            m = re.fullmatch(r"Page\s+No\s+(\d{1,3})", text)
+            if m:
                 nums.add(int(m.group(1)))
 
-    if not nums:
-        return 0
-
-    total = max(nums)
-    if sorted(nums) != list(range(1, total + 1)):
-        raise RuntimeError(
-            f"Pragativadi: incomplete page sequence {sorted(nums)}"
-        )
-    return total
+    return max(nums) if nums else 0
 
 
 def _resolve_page(session, edition, page_no, seen):
@@ -107,9 +103,6 @@ def _resolve_page(session, edition, page_no, seen):
                 reject_page_urls=True,
             )
 
-            # The previous implementation returned the FIRST valid image.
-            # That is the main quality bug: a thumbnail/preview can win even
-            # when the viewer also exposes a much larger original.
             selected = choose_best_candidate(
                 session,
                 candidates,
@@ -136,6 +129,7 @@ def _resolve_page(session, edition, page_no, seen):
 
 def download_pragativadi():
     d = datetime.now(ZoneInfo("Asia/Kolkata"))
+    date_iso = d.strftime("%Y-%m-%d")
     date = d.strftime("%d-%m-%Y")
     out = Path(f"Pragativadi_{d:%Y%m%d}.pdf")
 
@@ -148,7 +142,7 @@ def download_pragativadi():
     print("=" * 60)
 
     try:
-        edition = _find_edition(session, date)
+        edition = _find_edition(session, date_iso)
         print(f"✓ Edition: {edition}")
 
         edition_response = _fetch_page(session, edition)
@@ -165,12 +159,7 @@ def download_pragativadi():
                 flush=True,
             )
 
-            selected = _resolve_page(
-                session,
-                edition,
-                page_no,
-                seen,
-            )
+            selected = _resolve_page(session, edition, page_no, seen)
 
             if not selected:
                 raise RuntimeError(
@@ -190,8 +179,6 @@ def download_pragativadi():
                 flush=True,
             )
 
-        # Removed the old JPEG quality=92 / 4:2:0 recompression.
-        # img2pdf embeds JPEG page rasters directly.
         with out.open("wb") as pdf:
             pdf.write(img2pdf.convert(files))
 

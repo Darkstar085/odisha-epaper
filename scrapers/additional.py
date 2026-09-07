@@ -10,8 +10,17 @@ from bs4 import BeautifulSoup
 from pypdf import PdfReader
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/pdf;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+HTML_HEADERS = {
+    **HEADERS,
+    "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
 }
 
 TIMEZONE = ZoneInfo("Asia/Kolkata")
@@ -21,8 +30,18 @@ def _today():
     return datetime.now(TIMEZONE)
 
 
-def _download_pdf(session, url, output):
-    response = session.get(url, headers=HEADERS, timeout=(20, 180))
+def _download_pdf(session, url, output, referer=None):
+    headers = {
+        **HEADERS,
+        "Accept": "application/pdf,application/octet-stream;q=0.9,*/*;q=0.8",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+    }
+    if referer:
+        headers["Referer"] = referer
+        headers["Sec-Fetch-Site"] = "same-origin"
+
+    response = session.get(url, headers=headers, timeout=(20, 180))
     response.raise_for_status()
     data = response.content
 
@@ -44,8 +63,12 @@ def _download_pdf(session, url, output):
     return str(output)
 
 
-def _page(session, url):
-    response = session.get(url, headers=HEADERS, timeout=(20, 60))
+def _page(session, url, referer=None):
+    headers = {**HTML_HEADERS}
+    if referer:
+        headers["Referer"] = referer
+        headers["Sec-Fetch-Site"] = "same-origin"
+    response = session.get(url, headers=headers, timeout=(20, 60))
     response.raise_for_status()
     return response, BeautifulSoup(response.text, "html.parser")
 
@@ -83,52 +106,70 @@ def download_dinalipi():
     date_path = d.strftime("%Y-%m")
     date_name = d.strftime("%d-%m-%Y")
     output = Path(f"Dinalipi_bhubaneswar_{d:%Y-%m-%d}.pdf")
+    root_url = "https://www.dinalipiepaper.com/"
     url = f"https://www.dinalipiepaper.com/media/{date_path}/{date_name}-a.pdf"
 
     print("=" * 60)
     print(f"📰 DINALIPI — BHUBANESWAR — {d:%Y-%m-%d}")
     print("=" * 60)
 
-    return _download_pdf(requests.Session(), url, output)
+    session = requests.Session()
+    # Establish the normal public e-paper session first; the PDF endpoint
+    # rejects bare cross-origin requests from some runner IPs.
+    root_response, _ = _page(session, root_url)
+    return _download_pdf(session, url, output, referer=root_response.url)
 
 
 def download_odisha_bhaskar():
     d = _today()
     session = requests.Session()
-    root_url = "https://epaper.odishabhaskar.com/"
+    root_urls = (
+        "https://bhaskarepaper.in/",
+        "https://epaper.odishabhaskar.com/",
+    )
 
     print("=" * 60)
     print(f"📰 ODISHA BHASKAR — BHUBANESWAR — {d:%Y-%m-%d}")
     print("=" * 60)
 
-    response, soup = _page(session, root_url)
-    candidates = _unique_links(soup, response.url, r"/edition/\d+/")
-    if not candidates:
-        raise RuntimeError("Odisha Bhaskar: no edition link found")
-
-    edition_url = None
-    edition_soup = None
-    for href, _ in candidates:
+    last_error = None
+    for root_url in root_urls:
         try:
-            edition_response, candidate_soup = _page(session, href)
-        except requests.RequestException:
+            response, soup = _page(session, root_url)
+        except requests.RequestException as exc:
+            last_error = exc
             continue
-        text = candidate_soup.get_text(" ", strip=True).lower()
-        if "odisha bhaskar" in text and "bhubaneswar" in text:
+
+        candidates = _unique_links(soup, response.url, r"/edition/\d+/")
+        if not candidates:
+            continue
+
+        for href, _ in candidates:
+            try:
+                edition_response, candidate_soup = _page(session, href, response.url)
+            except requests.RequestException as exc:
+                last_error = exc
+                continue
+
+            text = candidate_soup.get_text(" ", strip=True).lower()
+            if "odisha bhaskar" not in text or "bhubaneswar" not in text:
+                continue
+
             edition_url = edition_response.url
-            edition_soup = candidate_soup
-            break
+            print(f"✓ Edition: {edition_url}")
+            pdf_url = _find_pdf_link(candidate_soup, edition_url)
+            if not pdf_url:
+                continue
 
-    if not edition_url:
-        raise RuntimeError("Odisha Bhaskar: Bhubaneswar edition not found")
+            output = Path(f"Odisha_Bhaskar_bhubaneswar_{d:%Y-%m-%d}.pdf")
+            try:
+                return _download_pdf(session, pdf_url, output, referer=edition_url)
+            except requests.RequestException as exc:
+                last_error = exc
 
-    print(f"✓ Edition: {edition_url}")
-    pdf_url = _find_pdf_link(edition_soup, edition_url)
-    if not pdf_url:
-        raise RuntimeError("Odisha Bhaskar: Full PDF link not found")
-
-    output = Path(f"Odisha_Bhaskar_bhubaneswar_{d:%Y-%m-%d}.pdf")
-    return _download_pdf(session, pdf_url, output)
+    if last_error:
+        raise RuntimeError(f"Odisha Bhaskar: could not access current e-paper: {last_error}") from last_error
+    raise RuntimeError("Odisha Bhaskar: Bhubaneswar edition or Full PDF link not found")
 
 
 def download_sanchar():
@@ -146,7 +187,7 @@ def download_sanchar():
         raise RuntimeError("Sanchar: no current edition link found")
 
     edition_url = candidates[0][0]
-    edition_response, edition_soup = _page(session, edition_url)
+    edition_response, edition_soup = _page(session, edition_url, response.url)
     edition_url = edition_response.url
     print(f"✓ Edition: {edition_url}")
 
@@ -155,7 +196,7 @@ def download_sanchar():
         raise RuntimeError("Sanchar: PDF link not found")
 
     output = Path(f"Sanchar_{d:%Y-%m-%d}.pdf")
-    return _download_pdf(session, pdf_url, output)
+    return _download_pdf(session, pdf_url, output, referer=edition_url)
 
 
 def download_swadhikar():
@@ -173,7 +214,7 @@ def download_swadhikar():
         raise RuntimeError("Swadhikar: Full PDF link not found")
 
     output = Path(f"Swadhikar_{d:%Y-%m-%d}.pdf")
-    return _download_pdf(session, pdf_url, output)
+    return _download_pdf(session, pdf_url, output, referer=response.url)
 
 
 if __name__ == "__main__":
