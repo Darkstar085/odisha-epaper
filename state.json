@@ -1,70 +1,70 @@
 {
   "sent": {
-    "pragativadi:2026-09-09": {
-      "sent_at": "2026-09-09T08:22:07.618214Z",
-      "sha256": "959460e55d469cab0ad481a6fdfb785ab431bd9b299c4d561cf24ddf712e29ea",
+    "samaja:2026-09-12": {
+      "sent_at": "2026-09-12T08:04:18.159648Z",
+      "sha256": "43e416c46d131ed3956f53c09eb546f11bef73f5b26955adb78eb7c44407a036",
       "pages": null,
-      "size_mb": 16.34,
+      "size_mb": 45.04,
       "uploader": "bot"
     },
-    "dharitri:2026-09-10": {
-      "sent_at": "2026-09-10T08:21:14.840515Z",
-      "sha256": "7962ffedd63864d624b786e2afe4c4a34aacb5221d578db497c039cccd9903a9",
+    "sambad:2026-09-12": {
+      "sent_at": "2026-09-12T08:04:36.617788Z",
+      "sha256": "ba7ab2f4d174ec32d4344580998beea3ec5dca13bef3744815aedfc0f4abe1f7",
       "pages": null,
-      "size_mb": 30.64,
+      "size_mb": 12.05,
       "uploader": "bot"
     },
-    "samaja:2026-09-11": {
-      "sent_at": "2026-09-11T08:14:09.631376Z",
-      "sha256": "bd64ae7c1a5ca6c2a1ce9cab33ebbe8a69f73724b4fb992dc1e758cd2665ee39",
+    "dharitri:2026-09-12": {
+      "sent_at": "2026-09-12T08:06:21.268278Z",
+      "sha256": "2e3310597a06fa4d038bc53b7ab3d84ab19302a883ff32a9a585648454789736",
       "pages": null,
-      "size_mb": 46.56,
+      "size_mb": 33.03,
       "uploader": "bot"
     },
-    "sambad:2026-09-11": {
-      "sent_at": "2026-09-11T08:15:45.734641Z",
-      "sha256": "6779a8a8946e9cba1848f3c75da0489e177d1f4f4fe38f42d7e21876770325ee",
+    "pragativadi:2026-09-12": {
+      "sent_at": "2026-09-12T08:07:29.669335Z",
+      "sha256": "0ef5a46204ed84400183087dd045b879638245fd46446a89a55899f2ac5d7bdc",
       "pages": null,
-      "size_mb": 10.69,
+      "size_mb": 17.91,
       "uploader": "bot"
     },
-    "prameya:2026-09-11": {
-      "sent_at": "2026-09-11T08:16:43.283357Z",
-      "sha256": "aad310528cbaf95029b9e3dbe7f5cc27447051ae062852fcc3e1e408e45d37db",
+    "prameya:2026-09-12": {
+      "sent_at": "2026-09-12T08:08:48.734326Z",
+      "sha256": "c41f7e6e73b65cd0f7b4826c349e467ac48c3a39dbee0b3d31680aebad2606af",
       "pages": null,
-      "size_mb": 35.94,
+      "size_mb": 36.48,
       "uploader": "bot"
     },
-    "dinalipi:2026-09-11": {
-      "sent_at": "2026-09-11T08:16:49.442482Z",
-      "sha256": "cb3fd086b8e6e4b9f1ac30b2a7ab7773895f53f710d2c9ea59e6f19376317c04",
+    "dinalipi:2026-09-12": {
+      "sent_at": "2026-09-12T08:08:54.631235Z",
+      "sha256": "bcb78a3abf79ad87e273b51124e629ea1673c4840a71b7f46f86790e7a0a3fa3",
       "pages": null,
-      "size_mb": 5.4,
+      "size_mb": 5.29,
       "uploader": "bot"
     },
-    "sanchar:2026-09-11": {
-      "sent_at": "2026-09-11T08:17:00.028058Z",
-      "sha256": "2aacc668eae0ac730d1182d45ca92aa9d369e490e368038ec11e48effd9728a9",
+    "sanchar:2026-09-12": {
+      "sent_at": "2026-09-12T08:09:05.568450Z",
+      "sha256": "dbfbb79bddef115dcbdf51d4c61b0e98d44bafdff86d0dfb623ccd8da10add36",
       "pages": null,
-      "size_mb": 23.22,
+      "size_mb": 32.73,
       "uploader": "bot"
     },
-    "swadhikar:2026-09-11": {
-      "sent_at": "2026-09-11T08:17:03.331975Z",
-      "sha256": "4fa38bedde9f9d968795fbde6ec75abe573ec59b21de0892475a1b2242295485",
+    "swadhikar:2026-09-12": {
+      "sent_at": "2026-09-12T08:09:08.148095Z",
+      "sha256": "b7d44fbf07c7299e4e98a092bd35049dbd3c1c0f26a53ae147da2187ed198406",
       "pages": null,
-      "size_mb": 2.99,
+      "size_mb": 2.79,
       "uploader": "bot"
     }
   },
   "hashes": {
-    "959460e55d469cab0ad481a6fdfb785ab431bd9b299c4d561cf24ddf712e29ea": "pragativadi:2026-09-09",
-    "7962ffedd63864d624b786e2afe4c4a34aacb5221d578db497c039cccd9903a9": "dharitri:2026-09-10",
-    "bd64ae7c1a5ca6c2a1ce9cab33ebbe8a69f73724b4fb992dc1e758cd2665ee39": "samaja:2026-09-11",
-    "6779a8a8946e9cba1848f3c75da0489e177d1f4f4fe38f42d7e21876770325ee": "sambad:2026-09-11",
-    "aad310528cbaf95029b9e3dbe7f5cc27447051ae062852fcc3e1e408e45d37db": "prameya:2026-09-11",
-    "cb3fd086b8e6e4b9f1ac30b2a7ab7773895f53f710d2c9ea59e6f19376317c04": "dinalipi:2026-09-11",
-    "2aacc668eae0ac730d1182d45ca92aa9d369e490e368038ec11e48effd9728a9": "sanchar:2026-09-11",
-    "4fa38bedde9f9d968795fbde6ec75abe573ec59b21de0892475a1b2242295485": "swadhikar:2026-09-11"
+    "43e416c46d131ed3956f53c09eb546f11bef73f5b26955adb78eb7c44407a036": "samaja:2026-09-12",
+    "ba7ab2f4d174ec32d4344580998beea3ec5dca13bef3744815aedfc0f4abe1f7": "sambad:2026-09-12",
+    "2e3310597a06fa4d038bc53b7ab3d84ab19302a883ff32a9a585648454789736": "dharitri:2026-09-12",
+    "0ef5a46204ed84400183087dd045b879638245fd46446a89a55899f2ac5d7bdc": "pragativadi:2026-09-12",
+    "c41f7e6e73b65cd0f7b4826c349e467ac48c3a39dbee0b3d31680aebad2606af": "prameya:2026-09-12",
+    "bcb78a3abf79ad87e273b51124e629ea1673c4840a71b7f46f86790e7a0a3fa3": "dinalipi:2026-09-12",
+    "dbfbb79bddef115dcbdf51d4c61b0e98d44bafdff86d0dfb623ccd8da10add36": "sanchar:2026-09-12",
+    "b7d44fbf07c7299e4e98a092bd35049dbd3c1c0f26a53ae147da2187ed198406": "swadhikar:2026-09-12"
   }
 }
