@@ -2,7 +2,7 @@ name: Daily Odia E-Paper Downloader
 
 on:
   schedule:
-    - cron: "0 9 * * *"
+    - cron: "17 9 * * *"
       timezone: "Asia/Kolkata"
   workflow_dispatch:
 
@@ -98,7 +98,7 @@ jobs:
           PY
           )"
 
-          commit_title="chore: update daily newspaper delivery — ${edition_date}"
+          commit_title="chore: update daily newspaper delivery - ${edition_date}"
           commit_body="$(cat <<EOF
           📰 Daily Odisha E-Paper Delivery
 
