@@ -35,27 +35,27 @@
       "size_mb": 31.7,
       "uploader": "bot"
     },
-    "dharitri:2026-10-20": {
-      "sent_at": "2026-10-20T08:57:19.050014Z",
-      "sha256": "001310f0f99fd26e96ed0535dadca32f34a357da6417450cbdffe7ea59b90ca3",
+    "dharitri:2026-10-21": {
+      "sent_at": "2026-10-21T08:56:05.432860Z",
+      "sha256": "85c3c44ff4afa0b41c8d5b0497ad71b2b9eae2176a34346dfd533e2947c73ec4",
       "pages": null,
       "size_mb": 31.85,
       "uploader": "bot"
     },
-    "sanchar:2026-10-20": {
-      "sent_at": "2026-10-20T08:57:46.588346Z",
-      "sha256": "343c896ca873d4f688f1d9fbcb2b4ed6d14e49a587b615d95b81b6012dc26563",
+    "sanchar:2026-10-21": {
+      "sent_at": "2026-10-21T08:56:40.077553Z",
+      "sha256": "def2f3ccd7186184cc1a7c03839d0d8c8e0c610eb6564b175241572744c69fd5",
       "pages": null,
       "size_mb": 36.46,
       "uploader": "bot"
     },
-    "swadhikar:2026-10-20": {
-      "sent_at": "2026-10-20T08:57:47.079999Z",
+    "swadhikar:2026-10-21": {
+      "sent_at": "2026-10-21T08:56:40.638545Z",
       "sha256": "0b9122771036a1c9b41076be725eb6f6b0e0c59f6a5e1440fe7503ea4b03f9a8",
       "pages": null,
       "size_mb": 6.36,
       "uploader": "duplicate-skip",
-      "duplicate_of": "swadhikar:2026-10-19"
+      "duplicate_of": "swadhikar:2026-10-20"
     }
   },
   "hashes": {
@@ -64,8 +64,8 @@
     "cf2a7e25bb99e99cab895203f7613169efd0b3e96adb9b7a0bab5f93d3a5da8a": "sambad:2026-10-19",
     "ad5d2d96dbbca0ec3b4c711dd9734bc8cb2ceeccf784081d82f6b1fdd1ef7dd8": "pragativadi:2026-10-19",
     "ae984f3e898c685b8dcaa6256c0bba205f3a3a92a26fa55a57ff2d1cbbfdb2de": "prameya:2026-10-19",
-    "001310f0f99fd26e96ed0535dadca32f34a357da6417450cbdffe7ea59b90ca3": "dharitri:2026-10-20",
-    "343c896ca873d4f688f1d9fbcb2b4ed6d14e49a587b615d95b81b6012dc26563": "sanchar:2026-10-20",
-    "0b9122771036a1c9b41076be725eb6f6b0e0c59f6a5e1440fe7503ea4b03f9a8": "swadhikar:2026-10-20"
+    "85c3c44ff4afa0b41c8d5b0497ad71b2b9eae2176a34346dfd533e2947c73ec4": "dharitri:2026-10-21",
+    "def2f3ccd7186184cc1a7c03839d0d8c8e0c610eb6564b175241572744c69fd5": "sanchar:2026-10-21",
+    "0b9122771036a1c9b41076be725eb6f6b0e0c59f6a5e1440fe7503ea4b03f9a8": "swadhikar:2026-10-21"
   }
 }
