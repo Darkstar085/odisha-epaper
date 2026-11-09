@@ -21,13 +21,6 @@
       "size_mb": 8.14,
       "uploader": "bot"
     },
-    "dharitri:2026-11-08": {
-      "sent_at": "2026-11-08T10:50:28.596127Z",
-      "sha256": "35fd1d70d3f3b607c8371f17d843eef75e823383725091d514d58b3218cbaff3",
-      "pages": null,
-      "size_mb": 33.43,
-      "uploader": "bot"
-    },
     "pragativadi:2026-11-08": {
       "sent_at": "2026-11-08T10:51:27.803081Z",
       "sha256": "6e7d6396a7892e4f423aa3c4a71c9eaa39056b0c689fe0cfd18233d9118ca173",
@@ -49,22 +42,30 @@
       "size_mb": 5.89,
       "uploader": "bot"
     },
-    "swadhikar:2026-11-08": {
-      "sent_at": "2026-11-08T10:52:22.670567Z",
+    "dharitri:2026-11-09": {
+      "sent_at": "2026-11-09T12:12:08.957398Z",
+      "sha256": "2aae36523ee4398c17789fb3865b1fd504ac26aabecab0add380729a1f47d17e",
+      "pages": null,
+      "size_mb": 33.43,
+      "uploader": "bot"
+    },
+    "swadhikar:2026-11-09": {
+      "sent_at": "2026-11-09T12:12:21.566821Z",
       "sha256": "f4f072ac02ea941617c71c96154cc295651b817e6a78184c8b4d4b0291565936",
       "pages": null,
       "size_mb": 2.98,
-      "uploader": "bot"
+      "uploader": "duplicate-skip",
+      "duplicate_of": "swadhikar:2026-11-08"
     }
   },
   "hashes": {
     "e4fa06f72dde5eb88403f02336733c9e5d164fc8b648b3eb814577d1228de03b": "sanchar:2026-11-01",
     "17996298893a46452d53f4b69deaf1c0b052999ba0049fb084da96e34477cb32": "samaja:2026-11-08",
     "b56e759c45a016b3fef658f70931a026175e66bf67d0069ca42a405581a0e003": "sambad:2026-11-08",
-    "35fd1d70d3f3b607c8371f17d843eef75e823383725091d514d58b3218cbaff3": "dharitri:2026-11-08",
     "6e7d6396a7892e4f423aa3c4a71c9eaa39056b0c689fe0cfd18233d9118ca173": "pragativadi:2026-11-08",
     "f3bd6140fff25b5f059bb142b4e2f7997e7f2564298eb1e0f2e3831a1987cea8": "prameya:2026-11-08",
     "1e59d0c719da56fbb5f6a3817f19e524c48f2f1591bea80e7dc6a62bd3ce79f3": "dinalipi:2026-11-08",
-    "f4f072ac02ea941617c71c96154cc295651b817e6a78184c8b4d4b0291565936": "swadhikar:2026-11-08"
+    "2aae36523ee4398c17789fb3865b1fd504ac26aabecab0add380729a1f47d17e": "dharitri:2026-11-09",
+    "f4f072ac02ea941617c71c96154cc295651b817e6a78184c8b4d4b0291565936": "swadhikar:2026-11-09"
   }
 }
